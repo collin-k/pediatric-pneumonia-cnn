@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]   
+name = "pneumonia_classification"
+version = "0.1.0"
+description = "A PyTorch deep learning pipeline for classifying pediatric pneumonia from chest X-rays."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Noah Ahmad", email = "nsahmad@uchicago.edu" },
+    { name = "Alina Hong", email = "yutongh@uchicago.edu" },
+    { name = "Collin Kim", email = "collinkim415@uchicago.edu" },
+    { name = "Ryusei (Leon) Nakano", email = "ryusei20000105@uchicago.edu" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# This acts as your modern requirements.txt directly inside the project config
+dependencies = [
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.3.0",
+    "Pillow>=10.0.0",
+    "opencv-python-headless>=4.8.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "tqdm>=4.65.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.0.0",   # Code formatter
+    "flake8>=6.0.0",   # Linter
+    "ipykernel",       # Allows running notebooks using this project environment
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
