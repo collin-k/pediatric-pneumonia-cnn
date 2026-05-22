@@ -1,9 +1,27 @@
-# Pediatric Pneumonia Classification via Chest X-Rays
+# Pediatric Pneumonia CNN
 
-An ML pipeline utilizing PyTorch and Transfer Learning (ResNet/Inception) to classify pediatric chest X-rays into 'Normal' or 'Pneumonia'.
+## Sanity Checks
 
-## Environment Setup
-1. Create a virtual environment:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
+Prepare the processed split:
+
+```bash
+python -m src.data_prep
+```
+
+Verify dataloader and model shapes:
+
+```bash
+python - <<'PY'
+from src.baseline_model import BaselineCNN
+from src.dataloader import get_dataloaders
+
+batch_size = 32
+train_loader, val_loader, test_loader, class_names = get_dataloaders(batch_size=batch_size, num_workers=0)
+images, labels = next(iter(train_loader))
+print(images.shape)  # torch.Size([batch_size, 3, 224, 224])
+
+model = BaselineCNN(num_classes=len(class_names))
+logits = model(images)
+print(logits.shape)  # torch.Size([batch_size, 2])
+PY
+```
