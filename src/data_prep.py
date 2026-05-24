@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import random
 import shutil
 from pathlib import Path
@@ -68,8 +69,9 @@ def copy_split_images(
     split_paths: dict[str, dict[str, list[Path]]],
     output_dir: Path,
     clear_output: bool = True,
+    use_symlinks: bool = False,
 ) -> None:
-    """Copy split images into ImageFolder-compatible directories."""
+    """Copy or symlink split images into ImageFolder-compatible directories."""
     if clear_output and output_dir.exists():
         shutil.rmtree(output_dir)
 
@@ -82,7 +84,10 @@ def copy_split_images(
                 destination_path = class_dir / source_path.name
                 if destination_path.exists():
                     destination_path = unique_destination_path(class_dir, source_path)
-                shutil.copy2(source_path, destination_path)
+                if use_symlinks:
+                    os.symlink(source_path.resolve(), destination_path)
+                else:
+                    shutil.copy2(source_path, destination_path)
 
 
 def unique_destination_path(class_dir: Path, source_path: Path) -> Path:
@@ -129,6 +134,7 @@ def prepare_data(
     output_dir: str | Path = PROCESSED_DATA_DIR,
     seed: int = DEFAULT_SEED,
     clear_output: bool = True,
+    use_symlinks: bool = False,
 ) -> Path:
     """Merge original splits and create an 80/10/10 stratified split."""
     raw_dir = Path(raw_dir)
@@ -136,7 +142,12 @@ def prepare_data(
 
     images_by_class = collect_images(raw_dir)
     split_paths = split_class_images(images_by_class, seed=seed)
-    copy_split_images(split_paths, output_dir, clear_output=clear_output)
+    copy_split_images(
+        split_paths,
+        output_dir,
+        clear_output=clear_output,
+        use_symlinks=use_symlinks,
+    )
     return write_split_summary(split_paths, output_dir)
 
 
@@ -150,6 +161,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not clear the output directory before copying files.",
     )
+    parser.add_argument(
+        "--symlink",
+        action="store_true",
+        help="Symlink images instead of copying (faster; raw data must stay in place).",
+    )
     return parser.parse_args()
 
 
@@ -160,5 +176,6 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         seed=args.seed,
         clear_output=not args.no_clear,
+        use_symlinks=args.symlink,
     )
     print(f"Saved split summary to {summary_csv}")
