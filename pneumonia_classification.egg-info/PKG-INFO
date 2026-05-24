@@ -1,0 +1,71 @@
+Metadata-Version: 2.4
+Name: pneumonia_classification
+Version: 0.1.0
+Summary: A PyTorch deep learning pipeline for classifying pediatric pneumonia from chest X-rays.
+Author-email: Noah Ahmad <nsahmad@uchicago.edu>, Alina Hong <yutongh@uchicago.edu>, Collin Kim <collinkim415@uchicago.edu>, "Ryusei (Leon) Nakano" <ryusei20000105@uchicago.edu>
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: torch>=2.2.0
+Requires-Dist: torchvision>=0.17.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: scikit-learn>=1.3.0
+Requires-Dist: Pillow>=10.0.0
+Requires-Dist: opencv-python-headless>=4.8.0
+Requires-Dist: matplotlib>=3.7.0
+Requires-Dist: seaborn>=0.12.0
+Requires-Dist: tqdm>=4.65.0
+Provides-Extra: dev
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: flake8>=6.0.0; extra == "dev"
+Requires-Dist: ipykernel; extra == "dev"
+
+# Pediatric Pneumonia CNN
+
+## Sanity Checks
+
+Prepare the processed split:
+
+```bash
+python -m src.data_prep
+```
+
+Verify dataloader and model shapes:
+
+```bash
+python - <<'PY'
+from src.baseline_model import BaselineCNN
+from src.dataloader import get_dataloaders
+
+batch_size = 32
+train_loader, val_loader, test_loader, class_names = get_dataloaders(batch_size=batch_size, num_workers=0)
+images, labels = next(iter(train_loader))
+print(images.shape)  # torch.Size([batch_size, 3, 224, 224])
+
+model = BaselineCNN(num_classes=len(class_names))
+logits = model(images)
+print(logits.shape)  # torch.Size([batch_size, 2])
+PY
+```
+
+## Train
+
+```bash
+python -m src.train --epochs 20 --patience 5
+```
+
+This uses class-weighted cross-entropy, tracks validation metrics each epoch, saves the best checkpoint to `checkpoints/best_model.pt`, and writes `results/training_history.json`.
+
+## Evaluate
+
+Run on the held-out test split:
+
+```bash
+python -m src.evaluate --checkpoint checkpoints/best_model.pt --split test
+```
+
+This writes metrics to `results/test_metrics.txt`, `results/test_metrics.json`, and a confusion matrix plot to `results/test_confusion_matrix.png`.
