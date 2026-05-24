@@ -12,13 +12,13 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.baseline_model import create_model
 from src.dataloader import get_dataloaders
 from src.metrics import class_weights_from_dataset, collect_predictions, compute_metrics
+from src.models import MODEL_CHOICES, build_optimizer, create_model, uses_pretrained_backbone
 
 
 DEFAULT_CHECKPOINT_DIR = Path("checkpoints")
-DEFAULT_HISTORY_PATH = Path("results/training_history.json")
+DEFAULT_RESULTS_DIR = Path("results")
 
 
 def set_seed(seed: int) -> None:
@@ -97,6 +97,7 @@ def save_checkpoint(
     torch.save(
         {
             "model_state_dict": model.state_dict(),
+            "model": args.model,
             "class_names": class_names,
             "epoch": epoch,
             "metrics": metrics,
@@ -111,26 +112,35 @@ def train(args: argparse.Namespace) -> Path:
     device = resolve_device()
     print(f"Using device: {device}")
 
+    pretrained = uses_pretrained_backbone(args.model)
     train_loader, val_loader, _, class_names = get_dataloaders(
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         img_size=args.img_size,
         num_workers=args.num_workers,
+        pretrained=pretrained,
     )
 
     class_weights = class_weights_from_dataset(train_loader.dataset).to(device)
+    print(f"Model: {args.model}")
     print(f"Class weights ({', '.join(class_names)}): {class_weights.tolist()}")
 
-    model = create_model(num_classes=len(class_names)).to(device)
+    model = create_model(args.model, num_classes=len(class_names)).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = build_optimizer(
+        model,
+        model_name=args.model,
+        lr=args.lr,
+        backbone_lr=args.backbone_lr,
+    )
 
     best_val_loss = float("inf")
     best_epoch = 0
     epochs_without_improvement = 0
     history: list[dict] = []
 
-    checkpoint_path = args.checkpoint_dir / "best_model.pt"
+    checkpoint_path = args.checkpoint_dir / args.model / "best_model.pt"
+    args.history_path = args.history_path or (DEFAULT_RESULTS_DIR / args.model / "training_history.json")
 
     for epoch in range(1, args.epochs + 1):
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
@@ -187,14 +197,26 @@ def train(args: argparse.Namespace) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train the baseline pneumonia CNN.")
+    parser = argparse.ArgumentParser(description="Train a pneumonia chest X-ray classifier.")
+    parser.add_argument(
+        "--model",
+        default="baseline",
+        choices=MODEL_CHOICES,
+        help="baseline, resnet18 (ImageNet fine-tune), or efficientnet_b0 (ImageNet fine-tune)",
+    )
     parser.add_argument("--data-dir", default="data/processed", type=Path)
     parser.add_argument("--checkpoint-dir", default=DEFAULT_CHECKPOINT_DIR, type=Path)
-    parser.add_argument("--history-path", default=DEFAULT_HISTORY_PATH, type=Path)
+    parser.add_argument("--history-path", default=None, type=Path)
     parser.add_argument("--batch-size", default=32, type=int)
     parser.add_argument("--img-size", default=224, type=int)
     parser.add_argument("--epochs", default=20, type=int)
-    parser.add_argument("--lr", default=1e-3, type=float)
+    parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate for the classification head")
+    parser.add_argument(
+        "--backbone-lr",
+        default=None,
+        type=float,
+        help="Backbone LR for transfer models (default: 0.1 * --lr)",
+    )
     parser.add_argument("--patience", default=5, type=int)
     parser.add_argument("--num-workers", default=2, type=int)
     parser.add_argument("--seed", default=42, type=int)

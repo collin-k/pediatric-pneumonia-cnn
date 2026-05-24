@@ -12,8 +12,9 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from src.baseline_model import create_model
+from src.dataloader import build_transforms
 from src.metrics import collect_predictions, compute_metrics, format_metrics, save_metrics
+from src.models import create_model, uses_pretrained_backbone
 
 
 DEFAULT_RESULTS_DIR = Path("results")
@@ -33,15 +34,12 @@ def get_eval_loader(
     batch_size: int,
     img_size: int,
     num_workers: int,
+    pretrained: bool = False,
 ) -> tuple[DataLoader, list[str]]:
-    normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-    eval_transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),
-            transforms.Grayscale(num_output_channels=3),
-            transforms.ToTensor(),
-            normalize,
-        ]
+    _, eval_transform = build_transforms(
+        img_size=img_size,
+        pretrained=pretrained,
+        augment=False,
     )
 
     dataset = datasets.ImageFolder(data_dir / split, transform=eval_transform)
@@ -54,11 +52,19 @@ def get_eval_loader(
     return loader, dataset.classes
 
 
+def resolve_model_name(checkpoint: dict) -> str:
+    if "model" in checkpoint:
+        return checkpoint["model"]
+    return checkpoint.get("args", {}).get("model", "baseline")
+
+
 def load_checkpoint(checkpoint_path: Path, device: torch.device) -> tuple[torch.nn.Module, list[str], dict]:
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     class_names = checkpoint["class_names"]
-    model = create_model(num_classes=len(class_names)).to(device)
+    model_name = resolve_model_name(checkpoint)
+    model = create_model(model_name, num_classes=len(class_names)).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
+    checkpoint["model"] = model_name
     return model, class_names, checkpoint
 
 
@@ -124,12 +130,14 @@ def evaluate(args: argparse.Namespace) -> dict:
     print(f"Using device: {device}")
 
     model, class_names, checkpoint = load_checkpoint(args.checkpoint, device)
+    model_name = resolve_model_name(checkpoint)
     loader, loader_class_names = get_eval_loader(
         data_dir=args.data_dir,
         split=args.split,
         batch_size=args.batch_size,
         img_size=args.img_size,
         num_workers=args.num_workers,
+        pretrained=uses_pretrained_backbone(model_name),
     )
 
     if loader_class_names != class_names:
@@ -169,7 +177,12 @@ def evaluate(args: argparse.Namespace) -> dict:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained pneumonia CNN checkpoint.")
-    parser.add_argument("--checkpoint", default="checkpoints/best_model.pt", type=Path)
+    parser.add_argument(
+        "--checkpoint",
+        default="checkpoints/best_model.pt",
+        type=Path,
+        help="Path to checkpoint (e.g. checkpoints/resnet18/best_model.pt)",
+    )
     parser.add_argument("--data-dir", default="data/processed", type=Path)
     parser.add_argument("--split", default="test", choices=("val", "test"))
     parser.add_argument("--output-dir", default=DEFAULT_RESULTS_DIR, type=Path)

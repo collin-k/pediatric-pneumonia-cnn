@@ -7,33 +7,48 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
+
+
+def build_transforms(img_size: int, pretrained: bool, augment: bool) -> tuple:
+    """Build train and eval transforms; use ImageNet stats for pretrained models."""
+    if pretrained:
+        normalize = transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+    else:
+        normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+
+    shared = [
+        transforms.Resize((img_size, img_size)),
+        transforms.Grayscale(num_output_channels=3),
+    ]
+    train_steps = list(shared)
+    if augment:
+        train_steps.extend(
+            [
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomRotation(degrees=10),
+            ]
+        )
+    train_steps.extend([transforms.ToTensor(), normalize])
+    eval_steps = [*shared, transforms.ToTensor(), normalize]
+
+    return transforms.Compose(train_steps), transforms.Compose(eval_steps)
+
 
 def get_dataloaders(
     data_dir: str | Path = "data/processed",
     batch_size: int = 32,
     img_size: int = 224,
     num_workers: int = 2,
+    pretrained: bool = False,
 ):
     """Return train, validation, and test dataloaders plus class names."""
     data_dir = Path(data_dir)
-    normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-
-    train_transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),
-            transforms.Grayscale(num_output_channels=3),
-            transforms.RandomRotation(degrees=10),
-            transforms.ToTensor(),
-            normalize,
-        ]
-    )
-    eval_transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),
-            transforms.Grayscale(num_output_channels=3),
-            transforms.ToTensor(),
-            normalize,
-        ]
+    train_transform, eval_transform = build_transforms(
+        img_size=img_size,
+        pretrained=pretrained,
+        augment=True,
     )
 
     train_dataset = datasets.ImageFolder(data_dir / "train", transform=train_transform)
