@@ -7,6 +7,8 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
+from src.augment import get_train_augmentation_steps
+
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
@@ -24,12 +26,7 @@ def build_transforms(img_size: int, pretrained: bool, augment: bool) -> tuple:
     ]
     train_steps = list(shared)
     if augment:
-        train_steps.extend(
-            [
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomRotation(degrees=10),
-            ]
-        )
+        train_steps.extend(get_train_augmentation_steps())
     train_steps.extend([transforms.ToTensor(), normalize])
     eval_steps = [*shared, transforms.ToTensor(), normalize]
 
@@ -42,13 +39,14 @@ def get_dataloaders(
     img_size: int = 224,
     num_workers: int = 2,
     pretrained: bool = False,
+    augment: bool = True,
 ):
     """Return train, validation, and test dataloaders plus class names."""
     data_dir = Path(data_dir)
     train_transform, eval_transform = build_transforms(
         img_size=img_size,
         pretrained=pretrained,
-        augment=True,
+        augment=augment,
     )
 
     train_dataset = datasets.ImageFolder(data_dir / "train", transform=train_transform)
