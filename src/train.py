@@ -80,8 +80,8 @@ def evaluate_epoch(
         running_loss += loss.item() * labels.size(0)
 
     avg_loss = running_loss / len(loader.dataset)
-    y_true, y_pred = collect_predictions(model, loader, device)
-    metrics = compute_metrics(y_true, y_pred, class_names)
+    y_true, y_pred, y_probs = collect_predictions(model, loader, device)
+    metrics = compute_metrics(y_true, y_pred, class_names, y_probs=y_probs)
     return avg_loss, metrics
 
 
@@ -119,6 +119,7 @@ def train(args: argparse.Namespace) -> Path:
         img_size=args.img_size,
         num_workers=args.num_workers,
         pretrained=pretrained,
+        augment=not args.no_augment,
     )
 
     class_weights = class_weights_from_dataset(train_loader.dataset).to(device)
@@ -220,6 +221,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--patience", default=5, type=int)
     parser.add_argument("--num-workers", default=2, type=int)
     parser.add_argument("--seed", default=42, type=int)
+    parser.add_argument(
+        "--no-augment",
+        action="store_true",
+        help="Disable train-time augmentation for ablation runs",
+    )
     return parser.parse_args()
 
 
