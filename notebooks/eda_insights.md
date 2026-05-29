@@ -79,24 +79,3 @@ Most images are grayscale as expected for chest X-rays, but **283 RGB-encoded fi
 Mean brightness is nearly identical between classes, so a model cannot rely on global brightness alone. Pneumonia images tend to have **slightly lower within-image contrast** (std 55.4 vs. 61.3), which may reflect denser opacities reducing intensity variation.
 
 Histogram overlays and mean composite images (see notebook) show subtle class-level differences, but no single pixel statistic cleanly separates the classes — spatial patterns learned by a CNN will matter more.
-
----
-
-## 4. Data Quality
-
-| Check | Result |
-|---|---|
-| Corrupted / unreadable files | 0 |
-| Exact duplicate groups (MD5) | 30 groups (62 files) |
-| Cross-split exact duplicates | 0 |
-| Perceptual duplicate groups (identical average hash) | 218 groups |
-| Size outliers (outside 1st–99th percentile) | 148 images |
-| Intensity outliers (outside 1st–99th percentile) | 118 images |
-
-**Key takeaways:**
-
-- No corrupted files — the dataset is fully loadable.
-- **No exact duplicates span train/test splits**, so there is no obvious byte-level data leakage.
-- 30 exact-duplicate groups (62 files total) within splits should be reviewed; keeping duplicates in both train and validation could inflate metrics.
-- 218 perceptual-duplicate groups suggest many visually similar images; a full near-duplicate scan (Hamming distance ≤ 5) is available in the notebook for deeper investigation.
-- Size and intensity outliers are not necessarily errors but warrant spot-checking via the notebook's image viewer.
