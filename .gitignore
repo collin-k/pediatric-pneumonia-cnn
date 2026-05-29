@@ -1,6 +1,10 @@
 .venv/
 data/
 checkpoints/
+notebooks/
 results/
 __pycache__/
 *.pyc
+*.egg-info/
+build/
+dist/
